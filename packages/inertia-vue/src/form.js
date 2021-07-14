@@ -1,18 +1,20 @@
 import Vue from 'vue'
+import isEqual from 'lodash.isequal'
 import cloneDeep from 'lodash.clonedeep'
 import { Inertia } from '@inertiajs/inertia'
 
 export default function(...args) {
   const rememberKey = typeof args[0] === 'string' ? args[0] : null
   const data = (typeof args[0] === 'string' ? args[1] : args[0]) || {}
-  const defaults = cloneDeep(data)
   const restored = rememberKey ? Inertia.restore(rememberKey) : null
+  let defaults = cloneDeep(data)
   let cancelToken = null
   let recentlySuccessfulTimeoutId = null
   let transform = data => data
 
   const form = Vue.observable({
     ...restored ? restored.data : data,
+    isDirty: false,
     errors: restored ? restored.errors : {},
     hasErrors: false,
     processing: false,
@@ -70,8 +72,8 @@ export default function(...args) {
         onCancelToken: (token) => {
           cancelToken = token
 
-          if (options.cancelToken) {
-            return options.cancelToken(token)
+          if (options.onCancelToken) {
+            return options.onCancelToken(token)
           }
         },
         onBefore: visit => {
@@ -97,27 +99,44 @@ export default function(...args) {
             return options.onProgress(event)
           }
         },
-        onBeforeRender: page => {
-          cancelToken = null
+        onSuccess: async page => {
           this.processing = false
           this.progress = null
-          this.errors = page.resolvedErrors
-          this.hasErrors = Object.keys(this.errors).length > 0
-          this.wasSuccessful = !this.hasErrors
-          this.recentlySuccessful = !this.hasErrors
+          this.clearErrors()
+          this.wasSuccessful = true
+          this.recentlySuccessful = true
           recentlySuccessfulTimeoutId = setTimeout(() => this.recentlySuccessful = false, 2000)
 
-          if (options.onBeforeRender) {
-            return options.onBeforeRender(page)
+          const onSuccess = options.onSuccess ? await options.onSuccess(page) : null
+          defaults = cloneDeep(this.data())
+          this.isDirty = false
+          return onSuccess
+        },
+        onError: errors => {
+          this.processing = false
+          this.progress = null
+          this.errors = errors
+          this.hasErrors = true
+
+          if (options.onError) {
+            return options.onError(errors)
           }
         },
         onCancel: () => {
-          cancelToken = null
           this.processing = false
           this.progress = null
 
           if (options.onCancel) {
             return options.onCancel()
+          }
+        },
+        onFinish: () => {
+          this.processing = false
+          this.progress = null
+          cancelToken = null
+
+          if (options.onFinish) {
+            return options.onFinish()
           }
         },
       }
@@ -159,15 +178,16 @@ export default function(...args) {
     },
   })
 
-  if (rememberKey) {
-    new Vue({
-      created() {
-        this.$watch(() => form, newValue => {
+  new Vue({
+    created() {
+      this.$watch(() => form, newValue => {
+        form.isDirty = !isEqual(form.data(), defaults)
+        if (rememberKey) {
           Inertia.remember(newValue.__remember(), rememberKey)
-        }, { immediate: true, deep: true })
-      },
-    })
-  }
+        }
+      }, { immediate: true, deep: true })
+    },
+  })
 
   return form
 }

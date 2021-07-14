@@ -14,7 +14,6 @@ type App<
   resolveComponent: (
     name: string
   ) => React.ComponentType | Promise<React.ComponentType>
-  transformProps?: (props: PagePropsBeforeTransform) => PageProps
 }>
 
 interface BaseInertiaLinkProps {
@@ -59,6 +58,8 @@ export const InertiaLink: InertiaLink
 export const Link: InertiaLink
 
 export const InertiaApp: App
+
+export const App: App
 
 type setDataByObject<TForm> = (data: TForm) => void
 type setDataByMethod<TForm> = (data: (previousData: TForm) => TForm) => void
