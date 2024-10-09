@@ -1,7 +1,7 @@
-import { VERSION } from 'svelte/compiler'
 import { router, setupProgress, type InertiaAppResponse, type Page } from '@inertiajs/core'
-import type { ComponentType } from 'svelte'
 import escape from 'html-escape'
+import type { ComponentType } from 'svelte'
+import { version as SVELTE_VERSION } from 'svelte/package.json'
 import App from './components/App.svelte'
 import store from './store'
 import type { ComponentResolver, ResolvedComponent } from './types'
@@ -14,7 +14,7 @@ interface CreateInertiaAppProps {
   resolve: ComponentResolver
   setup: (props: {
     el: Element
-    App: AppComponent
+    App: ComponentType<App>
     props: {
       initialPage: Page
       resolveComponent: ComponentResolver
@@ -47,11 +47,12 @@ export default async function createInertiaApp({
     store.set({
       component: initialComponent,
       page: initialPage,
+      key: null,
     })
   })
 
   if (isServer) {
-    const isSvelte5 = VERSION.startsWith('5')
+    const isSvelte5 = SVELTE_VERSION.startsWith('5')
     const { html, head, css } = await (async () => {
       if (isSvelte5) {
         const { render } = await dynamicImport('svelte/server')
@@ -99,11 +100,9 @@ export default async function createInertiaApp({
   })
 }
 
-/**
- * Loads the module dynamically during execution instead of at build time.
- * 
- * The @vite-ignore directive prevents Vite from analyzing or pre-bundling this import.
- **/
+// Loads the module dynamically during execution instead of at
+// build time. The `@vite-ignore` flag prevents Vite from
+// analyzing or pre-bundling this import.
 async function dynamicImport(module: string) {
   try {
     return await import(/* @vite-ignore */ module)
